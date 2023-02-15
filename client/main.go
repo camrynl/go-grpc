@@ -1,25 +1,50 @@
 package main
 
 import (
-	pb "bookshop/client/pb/inventory"
-	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
 	"log"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
+)
+
+const (
+	hubblePort     = 4244
+	clientCertFile = "./tls.crt"
+	clientKeyFile  = "./tls.key"
 )
 
 func main() {
-	conn, err := grpc.Dial("localhost:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	serverAddr := fmt.Sprintf("localhost:%d", hubblePort)
+	tlsConfig := tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         serverAddr,
+	}
+	var cert *tls.Certificate
+	if clientCertFile != "" && clientKeyFile != "" {
+		c, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
+		if err != nil {
+			log.Fatalf("failed to load keypair: %v", err)
+		}
+		cert = &c
+	}
+	tlsConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		if cert == nil {
+			log.Printf("certs not found")
+			return nil, errors.New("mTLS client certificate requested, but not provided")
+		}
+		return cert, nil
+	}
+
+	creds := credentials.NewTLS(&tlsConfig)
+
+	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("failed to connect: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Connect()
 
-	client := pb.NewInventoryClient(conn)
-	bookList, err := client.GetBookList(context.Background(), &pb.GetBookListRequest{})
-	if err != nil {
-		log.Fatalf("failed to get book list: %v", err)
-	}
-	log.Printf("book list: %v", bookList)
+	log.Printf("connection successful")
 }
