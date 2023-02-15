@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
 
+	"github.com/cilium/cilium/api/v1/observer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -44,7 +46,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect: %v", err)
 	}
-	defer conn.Connect()
-
-	log.Printf("connection successful")
+	client := observer.NewObserverClient(conn)
+	flows, err := client.GetFlows(context.Background(), &observer.GetFlowsRequest{})
+	if err != nil {
+		log.Fatalf("failed to get flows: %v", err)
+	}
 }
