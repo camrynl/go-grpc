@@ -46,9 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect: %v", err)
 	}
+
 	client := observer.NewObserverClient(conn)
 	flows, err := client.GetFlows(context.Background(), &observer.GetFlowsRequest{})
 	if err != nil {
 		log.Fatalf("failed to get flows: %v", err)
 	}
+	log.Printf("flows: %v", flows)
 }
